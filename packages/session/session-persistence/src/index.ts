@@ -42,6 +42,14 @@ export {
   validateStoredEvents,
 } from './storage-contract.ts'
 
+/** Multi-tenant scope context identifying tenant and user ownership. */
+export interface TenantScope {
+  /** Unique tenant identifier. */
+  readonly tenantId: string
+  /** Optional user identifier within the tenant. */
+  readonly userId?: string
+}
+
 /**
  * Lightweight stored-session observation returned by {@link SessionPersistence.stat}
  * and {@link SessionPersistence.list} without reading the full event log.
@@ -67,6 +75,8 @@ export interface SessionPersistenceCreateOptions {
    * mismatch at create.
    */
   readonly inheritedEventCount?: SessionLogOffset
+  /** Multi-tenant scoping context. */
+  readonly tenantScope?: TenantScope
 }
 
 /**
@@ -91,18 +101,24 @@ export interface SessionInspection extends SessionStorageMetadata {
 export interface SessionPersistenceOpenOptions {
   /** Optional cancellation observed before backend work starts. */
   readonly signal?: AbortSignal
+  /** Multi-tenant scoping context. */
+  readonly tenantScope?: TenantScope
 }
 
 /** Options for {@link SessionPersistence.stat}. */
 export interface SessionPersistenceStatOptions {
   /** Optional cancellation for backend metadata reads. */
   readonly signal?: AbortSignal
+  /** Multi-tenant scoping context. */
+  readonly tenantScope?: TenantScope
 }
 
 /** Options for {@link SessionPersistence.list}. */
 export interface SessionPersistenceListOptions {
   /** Optional cancellation for backend listing work. */
   readonly signal?: AbortSignal
+  /** Multi-tenant scoping context. */
+  readonly tenantScope?: TenantScope
 }
 
 declare module '@deepseek-ai/cordis' {

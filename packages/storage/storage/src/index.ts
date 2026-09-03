@@ -14,6 +14,8 @@ export { StorageError } from './error.ts'
 export type { StorageErrorCode } from './error.ts'
 export { UNIT_NAME_RE } from './backend.ts'
 export type { StorageBackend, KvFacet, KvUnit, KvUnitDescriptor } from './backend.ts'
+export type { TenantScope, TenantStorageProvider } from './tenant-storage-provider.ts'
+export { LocalTenantStorageProvider } from './tenant-storage-provider.ts'
 
 /**
  * Derive the Cordis lifecycle service that one named backend plugin provides.

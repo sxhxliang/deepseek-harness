@@ -173,8 +173,8 @@ class JsonlSessionPersistence extends SessionPersistence {
    * @param meta - the stored header naming the session and its cwd.
    * @returns the artifact kind and absolute path.
    */
-  private locate(meta: SessionHeader): SessionLocation {
-    return { kind: 'jsonl', path: logPath(this.root, meta.cwd, meta.id, this.compression) }
+  private locate(meta: SessionHeader, tenantScope?: SessionPersistenceCreateOptions['tenantScope']): SessionLocation {
+    return { kind: 'jsonl', path: logPath(this.root, meta.cwd, meta.id, this.compression, tenantScope) }
   }
 
   // --- SessionPersistence service API ---
@@ -197,7 +197,7 @@ class JsonlSessionPersistence extends SessionPersistence {
     const inheritedEventCount = SessionLogOffset(options?.inheritedEventCount ?? 0)
     await this.ensureRootEncoding()
     options?.signal?.throwIfAborted()
-    if (this.tracker.hasPending(snapshot.id) || await this.findLog(snapshot.id, options?.signal) !== undefined) {
+    if (this.tracker.hasPending(snapshot.id) || await this.findLog(snapshot.id, options?.signal, options?.tenantScope) !== undefined) {
       throw new SessionAlreadyExistsError(snapshot.id)
     }
     options?.signal?.throwIfAborted()
@@ -228,21 +228,21 @@ class JsonlSessionPersistence extends SessionPersistence {
         // listing can skip foreign junk, but a physically present log must
         // refuse loudly here — a newer-format log's user must see "upgrade the
         // harness", never "not found".
-        const stored = await this.requireStoredLog(id, options?.signal)
+        const stored = await this.requireStoredLog(id, options?.signal, options?.tenantScope)
         // The full read succeeded after the header-only read failed (a writer
         // completed the header in between): serve the session.
         return this.tracker.adopt(new JsonlSessionHandle(this, id, stored.meta, 'read', { cursor: 0, materialized: true, inheritedEventCount: stored.inheritedEventCount }))
       }
       // A stored foreign format version is refused at open, matching the
       // refusal every read of this handle would produce.
-      assertVersion(snapshot.header, this.locate(snapshot.header))
+      assertVersion(snapshot.header, this.locate(snapshot.header, options?.tenantScope))
       return this.tracker.adopt(new JsonlSessionHandle(this, id, snapshot.header, 'read', { cursor: 0, materialized: true, inheritedEventCount: snapshot.inheritedEventCount }))
     }
     // A pending entry always belongs to an ACTIVE creator handle (close erases
     // it), so the claim below rejects that case as already owned.
     this.tracker.claimWrite(id)
     try {
-      const stored = await this.requireStoredLog(id, options?.signal)
+      const stored = await this.requireStoredLog(id, options?.signal, options?.tenantScope)
       return this.tracker.adopt(new JsonlSessionHandle(this, id, stored.meta, 'write', {
         cursor: stored.events.length,
         materialized: true,
@@ -284,7 +284,7 @@ class JsonlSessionPersistence extends SessionPersistence {
     if (pending !== undefined) {
       return { header: pending.header, revision: pending.revision, inheritedEventCount: pending.inheritedEventCount }
     }
-    const path = await this.findLog(id, options?.signal)
+    const path = await this.findLog(id, options?.signal, options?.tenantScope)
     if (path === undefined) return undefined
     let first: string | undefined
     try {
@@ -343,7 +343,7 @@ class JsonlSessionPersistence extends SessionPersistence {
     // append lands mid-scan is then still in this snapshot (its artifact may
     // predate the scan), so create-to-list visibility never has a hole.
     const pending = [...this.tracker.pendingEntries()]
-    for (const artifact of await this.listArtifacts(signal)) {
+    for (const artifact of await this.listArtifacts(signal, options?.tenantScope)) {
       signal?.throwIfAborted()
       try {
         const identity = await stat(artifact.path, { bigint: true })
@@ -369,8 +369,8 @@ class JsonlSessionPersistence extends SessionPersistence {
   // --- handle-facing storage internals (package-private via the handle class below) ---
 
   /** Resolve and read one stored log, refusing loudly when the artifact is absent. */
-  private async requireStoredLog(id: SessionId, signal?: AbortSignal): Promise<StoredLog> {
-    const path = await this.findLog(id, signal)
+  private async requireStoredLog(id: SessionId, signal?: AbortSignal, tenantScope?: SessionPersistenceCreateOptions['tenantScope']): Promise<StoredLog> {
+    const path = await this.findLog(id, signal, tenantScope)
     if (path === undefined) throw new SessionPersistenceNotFoundError(id)
     return this.readStoredLog(path, id, signal)
   }
@@ -637,13 +637,13 @@ class JsonlSessionPersistence extends SessionPersistence {
     }
   }
 
-  private async listArtifacts(signal?: AbortSignal): Promise<Array<{ header: SessionHeader; path: string }>> {
+  private async listArtifacts(signal?: AbortSignal, tenantScope?: SessionPersistenceListOptions['tenantScope']): Promise<Array<{ header: SessionHeader; path: string }>> {
     signal?.throwIfAborted()
     await this.ensureRootEncoding()
     signal?.throwIfAborted()
     const artifacts: Array<{ header: SessionHeader; path: string }> = []
     const ids = new Set<SessionId>()
-    for (const project of await this.listProjectDirs(signal)) {
+    for (const project of await this.listProjectDirs(signal, tenantScope)) {
       signal?.throwIfAborted()
       for (const dir of await this.listSessionDirs(project, signal)) {
         signal?.throwIfAborted()
@@ -958,9 +958,9 @@ class JsonlSessionPersistence extends SessionPersistence {
   }
 
   /** Find the unique physical log for an id across every project directory. */
-  private async findLog(id: SessionId, signal?: AbortSignal): Promise<string | undefined> {
+  private async findLog(id: SessionId, signal?: AbortSignal, tenantScope?: SessionPersistenceCreateOptions['tenantScope']): Promise<string | undefined> {
     const matches: string[] = []
-    for (const project of await this.listProjectDirs(signal)) {
+    for (const project of await this.listProjectDirs(signal, tenantScope)) {
       signal?.throwIfAborted()
       await this.rejectLegacyFlatArtifact(project, id, signal)
       signal?.throwIfAborted()
@@ -1035,12 +1035,13 @@ class JsonlSessionPersistence extends SessionPersistence {
   }
 
   /** The human-readable project directories under the configured root. */
-  private async listProjectDirs(signal?: AbortSignal): Promise<string[]> {
+  private async listProjectDirs(signal?: AbortSignal, tenantScope?: SessionPersistenceCreateOptions['tenantScope']): Promise<string[]> {
+    const targetRoot = tenantScope?.tenantId ? join(this.root, 'tenants', tenantScope.tenantId) : this.root
     try {
       signal?.throwIfAborted()
-      const entries = await readdir(this.root, { withFileTypes: true })
+      const entries = await readdir(targetRoot, { withFileTypes: true })
       signal?.throwIfAborted()
-      return entries.filter(e => e.isDirectory()).map(e => join(this.root, e.name))
+      return entries.filter(e => e.isDirectory()).map(e => join(targetRoot, e.name))
     } catch (error) {
       // Only an absent root means no sessions; rethrow every other I/O failure.
       if (isENOENT(error)) return []
