@@ -1,5 +1,15 @@
-import { Context } from '@deepseek-ai/cordis'
 import { SandboxProvider, type SandboxPolicy, type ConfinedArgv } from '@deepseek-ai/dsh-sandbox'
+
+interface E2BContext {
+  e2b: {
+    getSandbox: () => Promise<{
+      commands: {
+        run: (cmd: string, opts: unknown) => Promise<{ stdout: string; stderr: string; exitCode: number }>
+      }
+    }>
+    cwd: string
+  }
+}
 
 /**
  * Remote E2B Sandbox Provider implementing `SandboxProvider` (`ctx.sandbox`).
@@ -8,14 +18,10 @@ import { SandboxProvider, type SandboxPolicy, type ConfinedArgv } from '@deepsee
 export class E2BSandboxProvider extends SandboxProvider {
   static inject = ['e2b']
 
-  constructor(ctx: Context) {
-    super(ctx)
-  }
-
   /**
    * Confine execution by delegating argv to remote E2B container execution.
    */
-  confine(argv: readonly string[], policy: SandboxPolicy): ConfinedArgv {
+  confine(argv: readonly string[], _policy: SandboxPolicy): ConfinedArgv {
     // E2B handles sandbox isolation remotely in a microVM environment
     return {
       argv: [...argv],
@@ -33,10 +39,14 @@ export class E2BSandboxProvider extends SandboxProvider {
   /**
    * Execute a shell command directly inside the remote E2B sandbox environment.
    */
-  async executeRemoteCommand(command: string, options: { cwd?: string; envs?: Record<string, string> } = {}): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    const sandbox = await this.ctx.e2b.getSandbox()
+  async executeRemoteCommand(
+    command: string,
+    options: { cwd?: string; envs?: Record<string, string> } = {},
+  ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+    const e2bCtx = this.ctx as unknown as E2BContext
+    const sandbox = await e2bCtx.e2b.getSandbox()
     const result = await sandbox.commands.run(command, {
-      cwd: options.cwd ?? this.ctx.e2b.cwd,
+      cwd: options.cwd,
       envs: options.envs,
     })
     return {

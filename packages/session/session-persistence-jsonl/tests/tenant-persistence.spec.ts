@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import type { SessionId } from '@deepseek-ai/dsh-session'
 import { projectDir, sessionDir, logPath } from '../src/format.ts'
 
 describe('Multi-tenant Session Persistence Paths', () => {
@@ -18,8 +19,8 @@ describe('Multi-tenant Session Persistence Paths', () => {
   it('generates tenant-isolated project and session directories when tenantScope is provided', () => {
     const tenantScope = { tenantId: 'tenant-abc', userId: 'user-xyz' }
     const pDir = projectDir(tmpDir, '/workspace', tenantScope)
-    const sDir = sessionDir(tmpDir, '/workspace', 'session-123' as any, tenantScope)
-    const lPath = logPath(tmpDir, '/workspace', 'session-123' as any, 'none', tenantScope)
+    const sDir = sessionDir(tmpDir, '/workspace', 'session-123' as unknown as SessionId, tenantScope)
+    const lPath = logPath(tmpDir, '/workspace', 'session-123' as unknown as SessionId, 'none', tenantScope)
 
     expect(pDir).toContain(join('tenants', 'tenant-abc'))
     expect(sDir).toContain(join('tenants', 'tenant-abc'))

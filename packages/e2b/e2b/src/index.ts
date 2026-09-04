@@ -17,7 +17,6 @@ export {
   Sandbox,
   SandboxNotFoundError,
 } from 'e2b'
-export { E2BSandboxProvider } from './sandbox-provider.ts'
 export type { CommandHandle, CommandResult, EntryInfo } from 'e2b'
 
 /**

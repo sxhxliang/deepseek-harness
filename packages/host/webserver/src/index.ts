@@ -18,8 +18,6 @@ import { renderIndexInjections, type IndexInjection } from './injections.ts'
 
 export { renderIndexInjections } from './injections.ts'
 export type { IndexInjection, IndexInjectionPlacement } from './injections.ts'
-export { extractTenantScope } from './auth-middleware.ts'
-export type { TenantContext } from './auth-middleware.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
