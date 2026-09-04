@@ -4091,12 +4091,6 @@ importers:
         specifier: workspace:^
         version: link:../../typert/protocol
 
-  packages/context/tenant-context:
-    devDependencies:
-      '@deepseek-ai/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-
   packages/context/time-context:
     dependencies:
       '@deepseek-ai/dsh-util-values':

@@ -1,6 +1,5 @@
 import { Context } from '@deepseek-ai/cordis'
 import { SandboxProvider, type SandboxPolicy, type ConfinedArgv } from '@deepseek-ai/dsh-sandbox'
-import { E2BRuntime } from './index.ts'
 
 /**
  * Remote E2B Sandbox Provider implementing `SandboxProvider` (`ctx.sandbox`).

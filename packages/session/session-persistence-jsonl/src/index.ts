@@ -1041,7 +1041,7 @@ class JsonlSessionPersistence extends SessionPersistence {
       signal?.throwIfAborted()
       const entries = await readdir(targetRoot, { withFileTypes: true })
       signal?.throwIfAborted()
-      return entries.filter(e => e.isDirectory()).map(e => join(targetRoot, e.name))
+      return entries.filter(e => e.isDirectory() && (tenantScope?.tenantId || e.name !== 'tenants')).map(e => join(targetRoot, e.name))
     } catch (error) {
       // Only an absent root means no sessions; rethrow every other I/O failure.
       if (isENOENT(error)) return []
