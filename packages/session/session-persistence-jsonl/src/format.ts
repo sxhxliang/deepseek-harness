@@ -24,6 +24,7 @@ import {
   SessionFormatUnsupportedError,
   sessionFormatVersionRefusal,
   type SessionStorageMetadata,
+  type TenantScope,
 } from '@deepseek-ai/dsh-session-persistence'
 
 /** Physical encoding selected for JSONL session artifacts. */
@@ -204,11 +205,13 @@ export function projectKey(cwd: string): string {
  * may be local or shared; this grouping does not prescribe its deployment.
  * @param root - the backend's session root directory.
  * @param cwd - the session's project directory; `undefined` selects `_no-cwd`.
+ * @param tenantScope - optional multi-tenant scoping details.
  * @returns the project directory path under `root`.
  */
-export function projectDir(root: string, cwd: string | undefined): string {
-  if (cwd === undefined) return join(root, '_no-cwd')
-  return join(root, projectKey(cwd))
+export function projectDir(root: string, cwd: string | undefined, tenantScope?: TenantScope): string {
+  const base = tenantScope?.tenantId ? join(root, 'tenants', tenantScope.tenantId) : root
+  if (cwd === undefined) return join(base, '_no-cwd')
+  return join(base, projectKey(cwd))
 }
 
 /**
@@ -217,10 +220,11 @@ export function projectDir(root: string, cwd: string | undefined): string {
  * @param root - the backend's session root directory.
  * @param cwd - the session's project directory.
  * @param id - the session id, encoded to one safe path segment.
+ * @param tenantScope - optional multi-tenant scoping details.
  * @returns the session directory beneath its project directory.
  */
-export function sessionDir(root: string, cwd: string | undefined, id: SessionId): string {
-  return join(projectDir(root, cwd), encodeSegment(id))
+export function sessionDir(root: string, cwd: string | undefined, id: SessionId, tenantScope?: TenantScope): string {
+  return join(projectDir(root, cwd, tenantScope), encodeSegment(id))
 }
 
 /**
@@ -229,6 +233,7 @@ export function sessionDir(root: string, cwd: string | undefined, id: SessionId)
  * @param cwd - the session's project directory (`undefined` → `_no-cwd`).
  * @param id - the session id, path-encoded via {@link encodeSegment} before filesystem use.
  * @param compression - physical artifact encoding and filename suffix.
+ * @param tenantScope - optional multi-tenant scoping details.
  * @returns the session's configured JSONL artifact path.
  */
 export function logPath(
@@ -236,8 +241,9 @@ export function logPath(
   cwd: string | undefined,
   id: SessionId,
   compression: JsonlCompression,
+  tenantScope?: TenantScope,
 ): string {
-  return join(sessionDir(root, cwd, id), `session${logSuffix(compression)}`)
+  return join(sessionDir(root, cwd, id, tenantScope), `session${logSuffix(compression)}`)
 }
 
 /**
