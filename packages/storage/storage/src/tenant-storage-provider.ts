@@ -53,8 +53,12 @@ export class LocalTenantStorageProvider implements TenantStorageProvider {
   constructor(private readonly baseDir: string = '.dsh/tenants') {}
 
   getTenantPath(scope: TenantScope, relativePath: string = ''): string {
-    const tenantDir = path.join(this.baseDir, scope.tenantId, scope.userId ?? 'default')
-    return relativePath ? path.join(tenantDir, relativePath) : tenantDir
+    const tenantDir = path.resolve(this.baseDir, scope.tenantId, scope.userId ?? 'default')
+    const resolved = relativePath ? path.resolve(tenantDir, relativePath) : tenantDir
+    if (!resolved.startsWith(tenantDir)) {
+      throw new Error(`Path traversal attempt detected: ${relativePath}`)
+    }
+    return resolved
   }
 
   async readFile(scope: TenantScope, relativePath: string): Promise<Uint8Array> {
